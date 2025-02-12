@@ -18,9 +18,10 @@ class HashMap:
         item = self.l1Hash(item)
         if self.threadActive:
             self.polyThread.join()
+            self.threadActive = False
         self.array.append(item)
         print(self.array)
-        self.polyThread = threading.Thread(target=self.calculate_regression, args=self.array)
+        self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.array, ))
         self.polyThread.start()
         self.threadActive = True
 
@@ -49,7 +50,16 @@ class HashMap:
             pw += 1
 
     def __getitem__(self, index):
-        pass
+        if self.threadActive:
+            self.polyThread.join()
+            self.threadActive = False
+        if not self.poly:
+            print(self.poly)
+            raise IndexError
+        else:
+            return self.array[round(self.poly(self.l1Hash(index)))]
 
 a = HashMap()
 a.add("a")
+a.add("b")
+print(a["a"])
