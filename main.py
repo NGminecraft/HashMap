@@ -1,5 +1,6 @@
 import numpy as np
 import threading
+import warnings
 from time import time_ns
 from math import log
 
@@ -13,6 +14,7 @@ class WordPair:
 
 class HashMap:
     def __init__(self):
+        warnings.simplefilter('ignore', np.RankWarning) # These are obnoxious
         # This array holds all the indices, so we don't have to keep calculating them
         self.index_array = []
         self.array = []
@@ -36,11 +38,12 @@ class HashMap:
             #Regression function will handle the rest
             self.array.append(WordPair(item, itemIndex))
             self.index_array.append(itemIndex)
+            self.calculate_regression(self.index_array)
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
-            self.assert_safe()
+            """self.assert_safe()
             self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
             self.polyThread.start()
-            self.threadActive = True
+            self.threadActive = True"""
 
 
     def calculate_regression(self, lst):
@@ -55,9 +58,7 @@ class HashMap:
         array = np.array(lst).astype(float)
         scaled_array = np.log10(array)
         xs = np.array([i for i in range(len(lst))]) 
-        assert len(array) == len(xs)
-        assert not np.isnan(array.min())
-        assert not np.isnan(xs.min())
+        assert not np.isnan(scaled_array).any() and not np.isinf(scaled_array).any() 
         print(scaled_array)
         pw = 1
         while True:
