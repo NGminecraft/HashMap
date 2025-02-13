@@ -1,6 +1,7 @@
 import numpy as np
 import threading
 from time import time_ns
+from math import log
 
 
 class WordPair:
@@ -52,15 +53,20 @@ class HashMap:
         # It doesn't strictly have to be sorted, but less work on the polyfit function
         lst.sort()
         array = np.array(lst).astype(float)
+        scaled_array = np.log10(array)
         xs = np.array([i for i in range(len(lst))]) 
+        assert len(array) == len(xs)
+        assert not np.isnan(array.min())
+        assert not np.isnan(xs.min())
+        print(scaled_array)
         pw = 1
         while True:
             # We use NumPY to generate a quadratic regression to fit the data
             # We loop through until we find the first power polynomial to
             # meet the criteria (close enough to needed value)
-            coefficents = np.polyfit(array, xs, pw)
+            coefficents = np.polyfit(scaled_array, xs, pw)
             polynomial = np.poly1d(coefficents)
-            for i, v in enumerate(lst):
+            for i, v in enumerate(scaled_array.tolist()):
                 num = polynomial(v)
                 if not round(num) == xs[i]:
                     break
@@ -80,6 +86,7 @@ class HashMap:
             print(f"Thread finished in {(time_ns() - time)} nanoseconds")
 
     def __getitem__(self, index):
+        scaled_index = log(self.l1Hash(index), 10)
         self.assert_safe()
         if not self.poly:
             raise IndexError
@@ -87,7 +94,7 @@ class HashMap:
             # We take the base index, that will likely never have collisions, then run it through our approximated function
             # We calculated in the calculate_regression function
             # We need to check to make sure the item we got is the same as the one we request
-            item = self.array[round(self.poly(self.l1Hash(index)))]
+            item = self.array[round(self.poly(scaled_index))]
             if item.key == self.l1Hash(index):
                 return item
             else:
