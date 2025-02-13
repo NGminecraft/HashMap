@@ -21,7 +21,7 @@ class HashMap:
         self.threadActive = False
         self.poly = None # If this is None, hash is empty
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: int("".join([str(ord(i.lower())) for i in list(x)]))
+        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
 
     def add(self, item):
         try:
@@ -51,7 +51,7 @@ class HashMap:
             return
         # It doesn't strictly have to be sorted, but less work on the polyfit function
         lst.sort()
-        array = np.array(lst)
+        array = np.array(lst).astype(float)
         xs = np.array([i for i in range(len(lst))]) 
         pw = 1
         while True:
@@ -93,6 +93,11 @@ class HashMap:
             else:
                 raise IndexError
 
+def words_in(words):
+    a = HashMap()
+    for i in words:
+        a.add(i)
+    return len(a.array), 0
 
 if __name__ == "__main__":
     a = HashMap()
@@ -100,3 +105,7 @@ if __name__ == "__main__":
     a.add("a")
     a.add("b")
     print(a["a"].number)
+
+    words = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew", "kiwi", "lemon", "mango", "nectarine", "orange", "papaya", "quince", "raspberry", "strawberry", "tangerine", "ugli", "vanilla", "watermelon", "xigua", "yellowfruit", "zucchini"]
+
+    print(words_in(words))
