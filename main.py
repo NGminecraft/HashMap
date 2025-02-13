@@ -1,9 +1,19 @@
 import numpy as np
 import threading
+from time import time_ns
+
+
+class WordPair:
+    def __init__(self, word, key, number=1):
+        self.word = word
+        self.number = number
+        self.key = key
 
 
 class HashMap:
     def __init__(self):
+        # This array holds all the indices, so we don't have to keep calculating them
+        self.index_array = []
         self.array = []
         self.size = 0
 
@@ -11,36 +21,47 @@ class HashMap:
         self.threadActive = False
         self.poly = None # If this is None, hash is empty
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: int("".join([str(ord(i)) for i in list(x)]))
+        self.l1Hash = lambda x: int("".join([str(ord(i.lower())) for i in list(x)]))
 
     def add(self, item):
-        # adds an item onto the map, then starts the regression calculation seperately
-        item = self.l1Hash(item)
-        if self.threadActive:
-            self.polyThread.join()
-            self.threadActive = False
-        self.array.append(item)
-        print(self.array)
-        self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.array, ))
-        self.polyThread.start()
-        self.threadActive = True
+        try:
+            a = self.__getitem__(item)
+            a.number += 1
+            return
+        except IndexError:
+            # adds an item onto the map, then starts the regression calculation seperately
+            itemIndex = self.l1Hash(item)
+            #We build our indexing around this array, so we can just stick it at the end, and the
+            #Regression function will handle the rest
+            self.array.append(WordPair(item, itemIndex))
+            self.index_array.append(itemIndex)
+            # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
+            self.assert_safe()
+            self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
+            self.polyThread.start()
+            self.threadActive = True
 
 
     def calculate_regression(self, lst):
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)"""
-        if type(lst) is int:
-            lst = [lst]
+        if len(lst) == 1:
+            # Regression doesn't work with one value, so just skip it
+            self.poly = lambda x: 0
+            return
+        # It doesn't strictly have to be sorted, but less work on the polyfit function
         lst.sort()
         array = np.array(lst)
         xs = np.array([i for i in range(len(lst))]) 
         pw = 1
         while True:
+            # We use NumPY to generate a quadratic regression to fit the data
+            # We loop through until we find the first power polynomial to
+            # meet the criteria (close enough to needed value)
             coefficents = np.polyfit(array, xs, pw)
             polynomial = np.poly1d(coefficents)
             for i, v in enumerate(lst):
                 num = polynomial(v)
-                print(num, xs[i], pw)
                 if not round(num) == xs[i]:
                     break
                 
@@ -48,18 +69,34 @@ class HashMap:
                 self.poly = polynomial
                 break
             pw += 1
-
-    def __getitem__(self, index):
+    
+    def assert_safe(self):
+        """ This method checks to make sure that the regression function finished"""
         if self.threadActive:
+            print("Waiting for regression thread to finish")
+            time = time_ns()
             self.polyThread.join()
             self.threadActive = False
+            print(f"Thread finished in {(time_ns() - time)} nanoseconds")
+
+    def __getitem__(self, index):
+        self.assert_safe()
         if not self.poly:
-            print(self.poly)
             raise IndexError
         else:
-            return self.array[round(self.poly(self.l1Hash(index)))]
+            # We take the base index, that will likely never have collisions, then run it through our approximated function
+            # We calculated in the calculate_regression function
+            # We need to check to make sure the item we got is the same as the one we request
+            item = self.array[round(self.poly(self.l1Hash(index)))]
+            if item.key == self.l1Hash(index):
+                return item
+            else:
+                raise IndexError
 
-a = HashMap()
-a.add("a")
-a.add("b")
-print(a["a"])
+
+if __name__ == "__main__":
+    a = HashMap()
+    a.add("a")
+    a.add("a")
+    a.add("b")
+    print(a["a"].number)
