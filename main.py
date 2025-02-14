@@ -16,7 +16,7 @@ class WordPair:
 
 class HashMap:
     def __init__(self):
-        warnings.simplefilter('ignore', np.RankWarning) # These are obnoxious
+#        warnings.simplefilter('ignore', np.RankWarning) # These are obnoxious
         # This array holds a list of indices
         self.index_array = []
         self.function_array = []
@@ -80,6 +80,7 @@ class HashMap:
 
         # Since every word of a character count needs to have its own function
         for i, v in enumerate(lst):
+            v = list(v)
             if len(v) == 0:
                 continue
             offset = sum([len(xs) for xs in lst[:i]])
@@ -104,12 +105,13 @@ class HashMap:
                     coefficents = np.polyfit(scaled_array, xs, pw)
                 except np.linalg.LinAlgError:
                     print(lst)
+                    break
                 coefficents[-1] += offset # Offset the intercept to match correct index
                 polynomial = np.poly1d(coefficents)
-                for j, v in enumerate(scaled_array.tolist()):
-                    num = polynomial(v)
-                    max_error = max(max_error, abs(num - xs[j] - offset))
-                    if not round(num) == xs[j] + offset:
+                for index in range(offset, offset+len(v)):
+                    num = polynomial(log(self.array[index].key, 10))
+                    max_error = max(max_error, abs(num - index))
+                    if not round(num) == index:
                         break
                     
                 else:
