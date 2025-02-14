@@ -1,6 +1,8 @@
 import numpy as np
 import threading
 import warnings
+import string
+from random import randint, choice
 from time import time_ns
 from math import log
 
@@ -101,7 +103,7 @@ class HashMap:
                 try:
                     coefficents = np.polyfit(scaled_array, xs, pw)
                 except np.linalg.LinAlgError:
-                    pass
+                    print(lst)
                 coefficents[-1] += offset # Offset the intercept to match correct index
                 polynomial = np.poly1d(coefficents)
                 for j, v in enumerate(scaled_array.tolist()):
@@ -151,6 +153,8 @@ class HashMap:
 test_hash = HashMap()
 
 def words_in(words):
+    words.sort(key=lambda x: a.l1Hash(x)) # This may help smooth out the data and avoid bumps
+    print([a.l1Hash(i) for i in words])
     for i in words:
         test_hash.add(i)
     return len(test_hash.array), 0
@@ -171,3 +175,8 @@ if __name__ == "__main__":
 
     print(words_in(words))
     print(lookup_word_count("apple"))
+    
+    def generate_random_word():
+        return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
+        
+    words_in([generate_random_word() for _ in range(100)])
