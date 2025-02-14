@@ -77,6 +77,34 @@ class HashMap:
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
+
+        def format_array(lst):
+            arr = np.array(lst).astype(np.float64)
+            return np.log10(arr)
+
+        def create_polynomial(indices, expected_indices):
+            power = 1
+            while power <= 10:
+                try:
+                    coes = np.polyfit(indices, expected_indices, power)
+                    polynomial =  np.poly1d(coes)
+                except np.RankWarning:
+                    power += 1
+
+        # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
+        # The get will go into the function array at the equivalent index array index, and then call it
+        for main_list_index, secondary_list in enumerate(lst):
+            # The indexing in the primary array is the offset (all the items in the lists before this one) + the result of the function
+            offset = sum(len(i) for i in lst[:main_list_index])
+            if len(secondary_list) == 0:
+                self.function_array[main_list_index] = None
+                continue
+            elif len(secondary_list) == 1:
+                self.function_array[main_list_index] = lambda x: offset # If there is only one item, we can just return the index
+                continue
+            formatted_array = format_array(secondary_list)
+            expected_indices = [i for i in range(offset, offset+len(secondary_list))] # This forgoes needing to manually add, or change the polynomial
+            
     
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
