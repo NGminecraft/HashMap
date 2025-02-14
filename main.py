@@ -20,6 +20,7 @@ class HashMap:
         self.function_array = []
         self.array = []
         self.size = 0
+        self.supress_prints = False
 
         self.polyThread = None
         self.threadActive = False
@@ -29,6 +30,8 @@ class HashMap:
     def add(self, item):
         # Just to keep things clean, I'll define all the internal functions here
         
+        if len(item) == 0:
+            return
 
         try:
             a = self.__getitem__(item)
@@ -38,34 +41,30 @@ class HashMap:
             # adds an item onto the map, then starts the regression calculation seperately
             itemIndex = self.l1Hash(item)
             numberOfChars = len(item)
-            
-            match numberOfChars-1:
-                case x if x < len(self.index_array):
-                    print("Adding to existing array")
-                    # The array already contains item(s) of the same length
 
-                    self.array.append(WordPair(item, itemIndex))
-                    self.index_array[x].append(itemIndex)
-                    self.assert_safe()
+            if numberOfChars-1 < len(self.index_array):
+                # The array already contains item(s) of the same length
+                self.array.append(WordPair(item, itemIndex))
+                self.index_array[numberOfChars-1].append(itemIndex)
                     
+            elif numberOfChars-1 == len(self.index_array):
+                # The array is the same size, so we can just add this to the end
+                self.function_array.append(lambda v: numberOfChars-1)
+                self.array.append(WordPair(item, itemIndex))
+                self.index_array.append([itemIndex, ])
                     
-                case x if x == len(self.index_array):
-                    # The array is the same size, so we can just add this to the end
-                    self.function_array.append(lambda v: x)
-                    self.array.append(WordPair(item, itemIndex))
-                    self.index_array.append([itemIndex, ])
+            elif numberOfChars-1 > len(self.index_array):
+                # We need to scale the array to add this to the right spot
 
-                case x if x > len(self.index_array):
-                    # We need to scale the array to add this to the right spot
-
-                    self.array.append(WordPair(item, itemIndex))
-                    self.function_array.extend([None]*(x-len(self.function_array)))
-                    self.index_array.extend([[]]*(x-len(self.index_array)))
-                    self.index_array.append([itemIndex, ])
-                    self.function_array.append(lambda v: x)
+                self.array.append(WordPair(item, itemIndex))
+                self.function_array.extend([None]*(numberOfChars-1-len(self.function_array)))
+                for i in range(numberOfChars-1-len(self.index_array)):
+                    self.index_array.append([])
+                self.index_array.append([itemIndex, ])
+                self.function_array.append(lambda v: numberOfChars-1)
 
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
-            self.array.sort(key=lambda x: x.word)
+            self.array.sort(key=lambda x: self.l1Hash(x.word))
             self.assert_safe()
             self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
             self.polyThread.start()
@@ -93,17 +92,21 @@ class HashMap:
             array = np.array(v).astype(float)
             scaled_array = np.log10(array)
             xs = np.array([j for j in range(len(v))]) 
-            
+            max_error = 0
             pw = 1
             while True:
                 # We use NumPY to generate a quadratic regression to fit the data
                 # We loop through until we find the first power polynomial to
                 # meet the criteria (close enough to needed value)
-                coefficents = np.polyfit(scaled_array, xs, pw)
+                try:
+                    coefficents = np.polyfit(scaled_array, xs, pw)
+                except np.linalg.LinAlgError:
+                    pass
                 coefficents[-1] += offset # Offset the intercept to match correct index
                 polynomial = np.poly1d(coefficents)
                 for j, v in enumerate(scaled_array.tolist()):
                     num = polynomial(v)
+                    max_error = max(max_error, abs(num - xs[j] - offset))
                     if not round(num) == xs[j] + offset:
                         break
                     
@@ -115,11 +118,13 @@ class HashMap:
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
         if self.threadActive:
-            print("Waiting for regression thread to finish")
+            if not self.supress_prints:
+                print("Waiting for regression thread to finish")
             time = time_ns()
             self.polyThread.join()
             self.threadActive = False
-            print(f"Thread finished in {(time_ns() - time)} nanoseconds")
+            if not self.supress_prints:
+                print(f"Thread finished in {(time_ns() - time)} nanoseconds")
 
     def __getitem__(self, index):
         scaled_index = log(self.l1Hash(index), 10)
@@ -141,7 +146,7 @@ class HashMap:
             if item.key == self.l1Hash(index):
                 return item
             else:
-                raise IndexError
+                raise IndexError("The item is not in the Hash Map, or there was a mismatch")
 
 test_hash = HashMap()
 
