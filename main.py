@@ -77,47 +77,6 @@ class HashMap:
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
-
-        # Since every word of a character count needs to have its own function
-        for i, v in enumerate(lst):
-            v = list(v)
-            if len(v) == 0:
-                continue
-            offset = sum([len(xs) for xs in lst[:i]])
-            # TODO: Offset the values to compensate for items in smaller word lengths
-            if len(v) == 1:
-                # Regression doesn't work with one value, so just skip it
-                self.poly = lambda x: offset
-                return
-            
-            # It doesn't strictly have to be sorted, but less work on the polyfit function
-            v.sort()
-            array = np.array(v).astype(float)
-            scaled_array = np.log10(array)
-            xs = np.array([j for j in range(len(v))]) 
-            max_error = 0
-            pw = 1
-            while True:
-                # We use NumPY to generate a quadratic regression to fit the data
-                # We loop through until we find the first power polynomial to
-                # meet the criteria (close enough to needed value)
-                try:
-                    coefficents = np.polyfit(scaled_array, xs, pw)
-                except np.linalg.LinAlgError:
-                    print(lst)
-                    break
-                coefficents[-1] += offset # Offset the intercept to match correct index
-                polynomial = np.poly1d(coefficents)
-                for index in range(offset, offset+len(v)):
-                    num = polynomial(log(self.array[index].key, 10))
-                    max_error = max(max_error, abs(num - index))
-                    if not round(num) == index:
-                        break
-                    
-                else:
-                    self.function_array[i] = polynomial
-                    break
-                pw += 1
     
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
