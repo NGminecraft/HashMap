@@ -67,16 +67,77 @@ class HashMap:
 
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
             self.array.sort(key=lambda x: self.l1Hash(x.word))
+            self.calculate_regression(self.index_array)
+            """
             self.assert_safe()
             self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
             self.polyThread.start()
-            self.threadActive = True
+            self.threadActive = True"""
 
 
     def calculate_regression(self, lst):
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
+
+        def setup_array(array):
+            array.sort()
+            array = np.array(array).astype(float)
+            return np.log10(array)
+
+        def fit(x_val, y_vals, offs=0):
+            x_vals = setup_array(x_val)
+            max_error = 0
+            pw = 1
+            while pw < 10:
+                # We use NumPY to generate a quadratic regression to fit the data
+                # We loop through until we find the first power polynomial to
+                # meet the criteria (close enough to needed value)
+                try:
+                    coefficents = np.polyfit(x_vals, y_vals, pw)
+                except np.linalg.LinAlgError:
+                    print(lst)
+                    break
+                coefficents[-1] += offs # Offset the intercept to match correct index
+                polynomial = np.poly1d(coefficents)
+                for index in range(offs, offs+len(v)):
+                    num = polynomial(log(self.array[index].key, 10))
+                    max_error = max(max_error, abs(num - index))
+                    if not round(num) == index:
+                        break
+                    
+                else:
+                    self.function_array[i] = polynomial
+                    break
+                pw += 1
+            else:
+                # We weren't able to get a sufficent fit, so we group things further
+                
+                # Split the list by first number
+                item_looking_at = str(x_val[0])[0]
+                first_digits = []
+                same_first_digit = []
+                functions = []
+                offs2 = 0
+                for hashed in x_val:
+                    if str(hashed)[0] == item_looking_at:
+                        same_first_digit.append(hashed)
+                    else:
+                        first_digits.append(int(item_looking_at))
+                        functions.append(fit(same_first_digit, np.array([j for j in range(len(same_first_digit))]), offs+offs2))
+                        offs2 += len(same_first_digit)
+                        same_first_digit = []
+                        item_looking_at = str(hashed)[0]
+                        same_first_digit.append(hashed)
+                else:
+                    first_digits.append(int(item_looking_at))
+                    functions.append(fit(same_first_digit, np.array([j for j in range(len(same_first_digit))]), offs+offs2))
+                    offs2 += len(same_first_digit)
+                    item_looking_at = str(hashed)[0]
+                    same_first_digit.append(hashed)
+                manager = fit(first_digits, np.array([j for j in range(len(first_digits))]), 0)
+                self.function_array[i] = lambda x: functions[round(manager(str(10**x)[0]))](x)
+            
 
         # Since every word of a character count needs to have its own function
         for i, v in enumerate(lst):
@@ -90,34 +151,10 @@ class HashMap:
                 self.poly = lambda x: offset
                 return
             
-            # It doesn't strictly have to be sorted, but less work on the polyfit function
-            v.sort()
-            array = np.array(v).astype(float)
-            scaled_array = np.log10(array)
-            xs = np.array([j for j in range(len(v))]) 
-            max_error = 0
-            pw = 1
-            while True:
-                # We use NumPY to generate a quadratic regression to fit the data
-                # We loop through until we find the first power polynomial to
-                # meet the criteria (close enough to needed value)
-                try:
-                    coefficents = np.polyfit(scaled_array, xs, pw)
-                except np.linalg.LinAlgError:
-                    print(lst)
-                    break
-                coefficents[-1] += offset # Offset the intercept to match correct index
-                polynomial = np.poly1d(coefficents)
-                for index in range(offset, offset+len(v)):
-                    num = polynomial(log(self.array[index].key, 10))
-                    max_error = max(max_error, abs(num - index))
-                    if not round(num) == index:
-                        break
-                    
-                else:
-                    self.function_array[i] = polynomial
-                    break
-                pw += 1
+            xs = np.array([j for j in range(len(v))])
+            fit(v, xs, offset)
+
+
     
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
@@ -182,3 +219,5 @@ if __name__ == "__main__":
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
     words_in([generate_random_word() for _ in range(100)])
+
+    pass
