@@ -79,17 +79,63 @@ class HashMap:
         """
 
         def format_array(lst):
-            arr = np.array(lst).astype(np.float64)
+            lst.sort()
+            arr = np.array(lst).astype(np.double)
             return np.log10(arr)
 
-        def create_polynomial(indices, expected_indices):
+        def create_polynomial(unformatted_indices, expected_indices):
+            indices = format_array(unformatted_indices)
             power = 1
-            while power <= 10:
+            while power <= 100:
                 try:
                     coes = np.polyfit(indices, expected_indices, power)
                     polynomial =  np.poly1d(coes)
                 except np.RankWarning:
                     power += 1
+                else:
+                    # Ok now we need to check and make sure the polynomial actually fits well enough
+                    for each_key, expected_output in zip(indices, expected_indices):
+                        returned = polynomial(each_key)
+                        # If any fail, we know that we need to refit
+                        if round(returned) != expected_output:
+                            power+=1
+                            break
+                    else:
+                        # They all passed, so this polynomial works
+                        return polynomial
+            else:
+                # If we get here, that's bad. We couldn't get a polynomial to reliably work
+                # Further data processing is needed.
+
+                # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
+
+                idx_start = 0
+                current_first_char = str(unformatted_indices[0])[0]
+                secondary_function_list = []
+                first_digits = [int(current_first_char)]
+
+                for i in range(1,len(unformatted_indices)):
+                    if str(unformatted_indices[i])[0] != current_first_char:
+                        func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i])
+                        secondary_function_list.append(func)
+
+                        idx_start = i
+                        current_first_char = str(unformatted_indices[i])[0]
+                        first_digits.append(int(current_first_char))
+                
+                final_function_list = [None for _ in range(first_digits[-1]-5)]
+                for d, f in zip(first_digits, secondary_function_list):
+                    final_function_list[d-6] = f
+
+
+                def returned_function(x):
+                    main_idx = 10**x
+                    first_digit = int(str(main_idx)[0])
+                    function = final_function_list[first_digit-6]
+                    return function(x)
+                
+                return returned_function
+        
 
         # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
         # The get will go into the function array at the equivalent index array index, and then call it
@@ -102,8 +148,10 @@ class HashMap:
             elif len(secondary_list) == 1:
                 self.function_array[main_list_index] = lambda x: offset # If there is only one item, we can just return the index
                 continue
-            formatted_array = format_array(secondary_list)
             expected_indices = [i for i in range(offset, offset+len(secondary_list))] # This forgoes needing to manually add, or change the polynomial
+            poly = create_polynomial(secondary_list, expected_indices)
+
+            self.function_array[main_list_index] = poly
             
     
     def assert_safe(self):
@@ -168,4 +216,8 @@ if __name__ == "__main__":
     def generate_random_word():
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
-    words_in([generate_random_word() for _ in range(100)])
+    inwords = [generate_random_word() for _ in range(100)]
+    words_in(inwords)
+    print("Output: ")
+    print("\n".join(lookup_word_count(i) for i in inwords))
+    print("Done!")
