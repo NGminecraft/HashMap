@@ -68,9 +68,10 @@ class HashMap:
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
             self.array.sort(key=lambda x: self.l1Hash(x.word))
             self.assert_safe()
-            self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
+            self.calculate_regression(self.index_array)
+            """self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
             self.polyThread.start()
-            self.threadActive = True
+            self.threadActive = True"""
 
 
     def calculate_regression(self, lst):
@@ -83,10 +84,14 @@ class HashMap:
             arr = np.array(lst).astype(np.double)
             return np.log10(arr)
 
-        def create_polynomial(unformatted_indices, expected_indices):
+        def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
+            if len(unformatted_indices) == 1:
+                return lambda x: expected_indices[0]
+            elif len(set(unformatted_indices)) == 1:
+                return lambda x: expected_indices[0]
             indices = format_array(unformatted_indices)
-            power = 1
-            while power <= 100:
+            power = 0
+            while power <= 10:
                 try:
                     coes = np.polyfit(indices, expected_indices, power)
                     polynomial =  np.poly1d(coes)
@@ -110,28 +115,37 @@ class HashMap:
                 # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
 
                 idx_start = 0
-                current_first_char = str(unformatted_indices[0])[0]
+                current_first_char = str(unformatted_indices[0])[backup_letters]
                 secondary_function_list = []
                 first_digits = [int(current_first_char)]
 
                 for i in range(1,len(unformatted_indices)):
-                    if str(unformatted_indices[i])[0] != current_first_char:
-                        func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i])
+                    if str(unformatted_indices[i])[backup_letters] != current_first_char:
+                        func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
                         secondary_function_list.append(func)
 
                         idx_start = i
-                        current_first_char = str(unformatted_indices[i])[0]
+                        current_first_char = str(unformatted_indices[i])[backup_letters]
                         first_digits.append(int(current_first_char))
+                else:
+                    func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
+                    secondary_function_list.append(func)
                 
-                final_function_list = [None for _ in range(first_digits[-1]-5)]
+                if backup_letters%2 == 0:
+                    normalizer = -6 # Only the first digit of each ascii letter can be shorted
+                    # It starts at A, 65, but we can have a 70, and thus can't minus 6 if were looking at the second digit
+                else:
+                    normalizer = 0
+
+                final_function_list = [None for _ in range(first_digits[-1]+normalizer+1)]
                 for d, f in zip(first_digits, secondary_function_list):
-                    final_function_list[d-6] = f
+                    final_function_list[d+normalizer] = f
 
-
-                def returned_function(x):
-                    main_idx = 10**x
-                    first_digit = int(str(main_idx)[0])
-                    function = final_function_list[first_digit-6]
+                
+                def returned_function(x, f_list=final_function_list, num_digits=backup_letters, norm = normalizer):
+                    main_idx = round(10**x)
+                    first_digit = int(str(main_idx)[num_digits])
+                    function = f_list[first_digit+norm]
                     return function(x)
                 
                 return returned_function
@@ -188,6 +202,7 @@ class HashMap:
                 raise IndexError("The item is not in the Hash Map, or there was a mismatch")
 
 test_hash = HashMap()
+finished = False
 
 def words_in(words):
     words.sort(key=lambda x: a.l1Hash(x)) # This may help smooth out the data and avoid bumps
@@ -218,6 +233,7 @@ if __name__ == "__main__":
         
     inwords = [generate_random_word() for _ in range(100)]
     words_in(inwords)
+    finished = True
     print("Output: ")
-    print("\n".join(lookup_word_count(i) for i in inwords))
+    print("\n".join(str(lookup_word_count(i)) for i in inwords))
     print("Done!")
