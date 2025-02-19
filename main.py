@@ -16,7 +16,7 @@ class WordPair:
 
 class HashMap:
     def __init__(self):
-#        warnings.simplefilter('ignore', np.RankWarning) # These are obnoxious
+        warnings.simplefilter('ignore') # These are obnoxious, and an expected, so we'll just get rid of them
         # This array holds a list of indices
         self.index_array = []
         self.function_array = []
@@ -39,7 +39,7 @@ class HashMap:
             a = self.__getitem__(item)
             a.number += 1
             return
-        except IndexError or TypeError:
+        except (IndexError, TypeError):
             # adds an item onto the map, then starts the regression calculation seperately
             itemIndex = self.l1Hash(item)
             numberOfChars = len(item)
@@ -68,10 +68,9 @@ class HashMap:
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
             self.array.sort(key=lambda x: self.l1Hash(x.word))
             self.assert_safe()
-            self.calculate_regression(self.index_array)
-            """self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
+            self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
             self.polyThread.start()
-            self.threadActive = True"""
+            self.threadActive = True
 
 
     def calculate_regression(self, lst):
@@ -206,7 +205,6 @@ finished = False
 
 def words_in(words):
     words.sort(key=lambda x: a.l1Hash(x)) # This may help smooth out the data and avoid bumps
-    print([a.l1Hash(i) for i in words])
     for i in words:
         test_hash.add(i)
     return len(test_hash.array), 0
@@ -231,11 +229,11 @@ if __name__ == "__main__":
     def generate_random_word():
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
-    #inwords = [generate_random_word() for _ in range(100)]
-    inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
+    inwords = [generate_random_word() for _ in range(100)]
+    #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
     print("Output: ")
-    print("\n".join(str(lookup_word_count(i)) for i in inwords))
+    print("\n".join(" ".join([i, str(lookup_word_count(i))]) for i in inwords))
     print("Done!")
     
