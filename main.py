@@ -48,33 +48,17 @@ class HashMap:
             itemIndex = self.l1Hash(item)
             numberOfChars = len(item)
 
-            if numberOfChars-1 < len(self.index_array):
-                # The array already contains item(s) of the same length
-                self.array.append(WordPair(item, itemIndex))
-                self.index_array[numberOfChars-1].append(itemIndex)
-                    
-            elif numberOfChars-1 == len(self.index_array):
-                # The array is the same size, so we can just add this to the end
-                self.function_array.append(lambda v: numberOfChars-1)
-                self.array.append(WordPair(item, itemIndex))
-                self.index_array.append([itemIndex, ])
-                    
-            elif numberOfChars-1 > len(self.index_array):
-                # We need to scale the array to add this to the right spot
-
-                self.array.append(WordPair(item, itemIndex))
-                self.function_array.extend([None]*(numberOfChars-1-len(self.function_array)))
-                for i in range(numberOfChars-1-len(self.index_array)):
-                    self.index_array.append([])
-                self.index_array.append([itemIndex, ])
-                self.function_array.append(lambda v: numberOfChars-1)
-
+            self.soft_insert(item)
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
-            self.array.sort(key=lambda x: self.l1Hash(x.word))
-            self.assert_safe()
-            self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
-            self.polyThread.start()
-            self.threadActive = True
+            self.update()
+            
+    def update(self):
+        print("Updating formulas")
+        self.array.sort(key=lambda x: self.l1Hash(x.word))
+        self.assert_safe()
+        self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
+        self.polyThread.start()
+        self.threadActive = True
 
 
     def calculate_regression(self, lst):
@@ -169,6 +153,43 @@ class HashMap:
             poly = create_polynomial(secondary_list, expected_indices)
 
             self.function_array[main_list_index] = poly
+    
+    def soft_insert(self, item, count=1):
+        itemIndex = self.l1Hash(item)
+        numberOfChars = len(item)
+
+        if numberOfChars-1 < len(self.index_array):
+            # The array already contains item(s) of the same length
+            self.array.append(WordPair(item, itemIndex, count))
+            self.index_array[numberOfChars-1].append(itemIndex)
+                
+        elif numberOfChars-1 == len(self.index_array):
+            # The array is the same size, so we can just add this to the end
+            self.function_array.append(lambda v: numberOfChars-1)
+            self.array.append(WordPair(item, itemIndex))
+            self.index_array.append([itemIndex, ])
+                
+        elif numberOfChars-1 > len(self.index_array):
+            # We need to scale the array to add this to the right spot
+
+            self.array.append(WordPair(item, itemIndex))
+            self.function_array.extend([None]*(numberOfChars-1-len(self.function_array)))
+            for i in range(numberOfChars-1-len(self.index_array)):
+                self.index_array.append([])
+            self.index_array.append([itemIndex, ])
+            self.function_array.append(lambda v: numberOfChars-1)
+
+            
+    def words_in(self, words):
+        unique_words = list(set(words))
+        
+        for item in unique_words:
+            self.soft_insert(item, 0)
+            
+        for item in words:
+            self.add(item)
+            
+        self.update()
             
     
     def assert_safe(self):
@@ -208,10 +229,7 @@ test_hash = HashMap()
 finished = False
 
 def words_in(words):
-    words.sort(key=lambda x: a.l1Hash(x)) # This may help smooth out the data and avoid bumps
-    for i in words:
-        test_hash.add(i)
-    return len(test_hash.array), 0
+    test_hash.words_in(words)
 
 def lookup_word_count(word):
     return test_hash[word].number
@@ -233,11 +251,11 @@ if __name__ == "__main__":
     def generate_random_word():
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
-    inwords = [generate_random_word() for _ in range(1000)]
+    inwords = [generate_random_word() for _ in range(1000000)]
     #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
     print("Output: ")
-    print("\n".join(" ".join([i, str(lookup_word_count(i))]) for i in inwords))
+    print("\n".join(" ".join([i, str(lookup_word_count(i))]) for i in sorted(inwords, key=lambda x: test_hash.l1Hash(x))))
     print("Done!")
     
