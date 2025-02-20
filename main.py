@@ -30,7 +30,11 @@ class HashMap:
         self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
 
     def add(self, item):
-        # Just to keep things clean, I'll define all the internal functions here
+        """
+        IDEAS TO SPEED UP
+        Parrallelize the first for loop in the regression function
+        When passing in a lot of data, refrain from actually updating regression until it's done
+        """
         
         if len(item) == 0:
             return
