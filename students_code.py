@@ -27,7 +27,7 @@ class HashMap:
         self.polyThread = None
         self.threadActive = False
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
+        self.l1Hash = lambda x: int("".join([str(ord(i.strip('’').upper())) for i in list(x)]))
 
     def add(self, item):
         """
@@ -87,7 +87,7 @@ class HashMap:
                         returned = polynomial(each_key)
                         # If any fail, we know that we need to refit
                         error = abs(returned-expected_output)
-                        if error > 0.4: # I originally just used round(returned) != expected_output, but was running into what I think is floating point error
+                        if error > 0.49: # I originally just used round(returned) != expected_output, but was running into what I think is floating point error
                             power+=1
                             break
                     else:
@@ -116,7 +116,7 @@ class HashMap:
                     func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
                     secondary_function_list.append(func)
                 
-                if backup_letters%2 == 0:
+                if backup_letters%2 == 0 and first_digits[0] >= 6:
                     normalizer = -6 # Only the first digit of each ascii letter can be shorted
                     # It starts at A, 65, but we can have a 70, and thus can't minus 6 if were looking at the second digit
                 else:
@@ -250,7 +250,8 @@ test_hash = HashMap()
 finished = False
 
 def words_in(words):
-    test_hash.words_in(words)
+    words.sort()
+    return test_hash.words_in(words)
 
 def lookup_word_count(word):
     item = test_hash[word]

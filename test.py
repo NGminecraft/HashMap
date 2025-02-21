@@ -1,4 +1,4 @@
-import main
+import students_code
 import tqdm
 from random import choice, randint
 from string import ascii_lowercase
@@ -9,7 +9,7 @@ lines = ["".join([choice(ascii_lowercase) for j in range(randint(1,15))]) for _ 
 
 print("Generated words, sorting")
 
-a = main.HashMap()
+a = students_code.HashMap()
 
 lines.sort(key=lambda x: a.l1Hash(x))
 
