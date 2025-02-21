@@ -5,7 +5,6 @@ import string
 from random import randint, choice
 from time import time_ns
 from math import log
-import tqdm
 
 
 class WordPair:
@@ -34,14 +33,14 @@ class HashMap:
         """
         IDEAS TO SPEED UP
         Parrallelize the first for loop in the regression function
-        When passing in a lot of data, refrain from actually updating regression until it's done
+        When passing in a lot of data, refrain from actually updating regression until it's done DONE
         """
         
         if len(item) == 0:
             return
 
         try:
-            a = self.__getitem__(item)
+            a = self.__getitem__(item)[0]
             a.number += 1
             return
         except (IndexError, TypeError):
@@ -128,11 +127,18 @@ class HashMap:
                     final_function_list[d+normalizer] = f
 
                 
-                def returned_function(x, f_list=final_function_list, num_digits=backup_letters, norm = normalizer):
+                def returned_function(x, f_list=final_function_list, num_digits=backup_letters, norm=normalizer):
                     main_idx = round(10**x)
                     first_digit = int(str(main_idx)[num_digits])
                     funct = f_list[first_digit+norm]
-                    return funct(x)
+                    funct_result = funct(x)
+                    if type(funct_result) is tuple:
+                        value = funct_result[0]
+                        steps = funct_result[1] + 1
+                    else:
+                        value = funct_result
+                        steps = 1
+                    return value, steps
                 
                 return returned_function
         
@@ -165,13 +171,13 @@ class HashMap:
         elif numberOfChars-1 == len(self.index_array):
             # The array is the same size, so we can just add this to the end
             self.function_array.append(lambda v: numberOfChars-1)
-            self.array.append(WordPair(item, itemIndex))
+            self.array.append(WordPair(item, itemIndex, count))
             self.index_array.append([itemIndex, ])
                 
         elif numberOfChars-1 > len(self.index_array):
             # We need to scale the array to add this to the right spot
 
-            self.array.append(WordPair(item, itemIndex))
+            self.array.append(WordPair(item, itemIndex, count))
             self.function_array.extend([None]*(numberOfChars-1-len(self.function_array)))
             for i in range(numberOfChars-1-len(self.index_array)):
                 self.index_array.append([])
@@ -190,8 +196,10 @@ class HashMap:
         self.update()
         
     
-        for item in tqdm.tqdm(words):
+        for item in words:
             self.add(item)
+
+        return len(self.array), 0
                         
     
     def assert_safe(self):
@@ -218,14 +226,25 @@ class HashMap:
             if funct is None:
                 raise IndexError("The item is not in the Hash Map")
             
-            value_to_check = round(funct(scaled_index))
+            result = funct(scaled_index)
+            if type(result) is tuple:
+                number_of_steps = result[1] + 2
+                value_to_check = round(result[0])
+            else:
+                number_of_steps = 2
+                value_to_check = round(result)
+            
             if value_to_check-1 > len(self.array):
                 raise IndexError("The item is not in the Hash Map")
-            item = self.array[round(funct(scaled_index))]
+            item = self.array[value_to_check]
             if item.key == self.l1Hash(index):
-                return item
+                return item, number_of_steps
             else:
                 raise IndexError("The item is not in the Hash Map, or there was a mismatch")
+    
+    def lookup_word_count(self, word):
+        item = self.__getitem__(word)
+        return item[0].number, item[1]
 
 test_hash = HashMap()
 finished = False
@@ -234,27 +253,14 @@ def words_in(words):
     test_hash.words_in(words)
 
 def lookup_word_count(word):
-    return test_hash[word].number
+    item = test_hash[word]
+    return item[0].number, item[1]
 
 if __name__ == "__main__":
-    """
-    a = HashMap()
-    a.add("a")
-    a.add("a")
-    a.add("b")
-    print(a["a"].number)
-
-    words = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew", "kiwi", "lemon", "mango", "nectarine", "orange", "papaya", "quince", "raspberry", "strawberry", "tangerine", "ugli", "vanilla", "watermelon", "xigua", "yellowfruit", "zucchini"]
-
-    print(len(words))
-
-    print(words_in(words))
-    print(lookup_word_count("apple"))
-    """
     def generate_random_word():
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
-    inwords = [generate_random_word() for _ in range(100000)]
+    inwords = [generate_random_word() for _ in range(1000000)]
     #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
