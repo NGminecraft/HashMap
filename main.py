@@ -5,6 +5,7 @@ import string
 from random import randint, choice
 from time import time_ns
 from math import log
+import tqdm
 
 
 class WordPair:
@@ -45,15 +46,12 @@ class HashMap:
             return
         except (IndexError, TypeError):
             # adds an item onto the map, then starts the regression calculation seperately
-            itemIndex = self.l1Hash(item)
-            numberOfChars = len(item)
-
             self.soft_insert(item)
             # Let's run this on a seperate thread, this could get time consuming, and any time saved is something
             self.update()
             
     def update(self):
-        print("Updating formulas")
+        print(f"Updating formulas for {len(self.array)} items")
         self.array.sort(key=lambda x: self.l1Hash(x.word))
         self.assert_safe()
         self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
@@ -89,7 +87,8 @@ class HashMap:
                     for each_key, expected_output in zip(indices, expected_indices):
                         returned = polynomial(each_key)
                         # If any fail, we know that we need to refit
-                        if round(returned) != expected_output:
+                        error = abs(returned-expected_output)
+                        if error > 0.4: # I originally just used round(returned) != expected_output, but was running into what I think is floating point error
                             power+=1
                             break
                     else:
@@ -185,12 +184,15 @@ class HashMap:
         
         for item in unique_words:
             self.soft_insert(item, 0)
-            
-        for item in words:
-            self.add(item)
+
+        print("Added each unique word, populating counts, this may take a while")
             
         self.update()
-            
+        
+    
+        for item in tqdm.tqdm(words):
+            self.add(item)
+                        
     
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
@@ -235,6 +237,7 @@ def lookup_word_count(word):
     return test_hash[word].number
 
 if __name__ == "__main__":
+    """
     a = HashMap()
     a.add("a")
     a.add("a")
@@ -247,11 +250,11 @@ if __name__ == "__main__":
 
     print(words_in(words))
     print(lookup_word_count("apple"))
-    
+    """
     def generate_random_word():
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
-    inwords = [generate_random_word() for _ in range(1000000)]
+    inwords = [generate_random_word() for _ in range(10000)]
     #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
