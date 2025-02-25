@@ -64,14 +64,18 @@ class HashMap:
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
 
-        conditions = [None for _ in lst]
-        functs = [None for _ in lst]
+        all_indices = []
+        for i in lst:
+            all_indices.extend(i)
+
+        conditions = []
+        functs = []
         x_vals = [] # We can just sort this later and evetrything will be correct (presumably)
 
         def format_array(lst):
             lst.sort()
             arr = np.array(lst).astype(np.double)
-            return np.log10(arr)
+            return arr
 
         def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
             """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
@@ -79,7 +83,7 @@ class HashMap:
             match len(unformatted_indices):
                 case 1:
                      # If there is only one item, return it's index
-                    return lambda x: expected_indices[0]
+                    return [(unformatted_indices[0], unformatted_indices[-1])], lambda x: expected_indices[0]
                 case 2:
                     
                     # I can actually do this, and this is probably a bit faster
@@ -89,12 +93,10 @@ class HashMap:
                     
                     def linear_function(x, m=slope, b=intercept):
                         return m * x + b
-                    return linear_function
+                    return [(unformatted_indices[0], unformatted_indices[-1])], [linear_function, ]
                 case _:
                     power = 0
                     MAX_POWER = 10
-                    error_arrays = [None for _ in range(MAX_POWER)]
-                    num_longest_continous = [None for _ in range(MAX_POWER)]
                     while power <= MAX_POWER:
                         coes = np.polyfit(indices, expected_indices, power)
                         polynomial =  np.poly1d(coes)
@@ -108,7 +110,7 @@ class HashMap:
                                 break # TODO, allow functions to map to only part of the data
                         else:
                             # They all passed, so this polynomial works
-                            return polynomial
+                            return [(unformatted_indices[0], unformatted_indices[-1])], [polynomial, ]
                     else:
                         # If we get here, that's bad (we get here quite often). We couldn't get a polynomial to reliably work
                         # Further data processing is needed.
@@ -120,18 +122,24 @@ class HashMap:
                         secondary_function_list = []
                         first_digits = [int(current_first_char)]
 
+                        locations = []
+
+
                         for i in range(1,len(unformatted_indices)):
                             if str(unformatted_indices[i])[backup_letters] != current_first_char:
-                                func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
+                                loc, func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
                                 secondary_function_list.append(func)
+                                locations.append(loc)
 
                                 idx_start = i
                                 current_first_char = str(unformatted_indices[i])[backup_letters]
                                 first_digits.append(int(current_first_char))
                         else:
-                            func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
+                            loc, func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
                             secondary_function_list.append(func)
+                            locations.append(loc)
                         
+                        """
                         if backup_letters%2 == 0 and first_digits[0] >= 6:
                             normalizer = -6 # Only the first digit of each ascii letter can be shorted
                             # It starts at A, 65, but we can have a 70, and thus can't minus 6 if were looking at the second digit
@@ -155,9 +163,9 @@ class HashMap:
                                 value = funct_result
                                 steps = 1
                             return value, steps
-                        
-                        return returned_function
-        
+                        """
+                        return locations, secondary_function_list
+
         def single_instance(idx, lst_to_use, offset):
             """This function uses create_polynomial to map functions to the correct spots
             It's seperate to allow multithreading
@@ -168,19 +176,18 @@ class HashMap:
 
             match len(lst_to_use):
                 case 0:
-                    self.function_array[idx] = None
+                    pass
+
                 case 1:
-                    def return_const(x, const=offset):
-                        """A lambda didn't work for some reason"""
-                        return const
-                
-                    self.function_array[idx] = return_const # Just return the offset if everything works
+                    conditions.append((lst_to_use[0], lst_to_use[-1]))
+                    functs.append(lambda x: offset) # Just return the offset if everything works
                 case _:
                     expected_indices = [i for i in range(offset, offset+len(lst_to_use))] # This forgoes needing to manually add, or change the polynomial
                     
-                    poly = create_polynomial(lst_to_use, expected_indices)
+                    conds, polys = create_polynomial(lst_to_use, expected_indices)
 
-                    self.function_array[idx] = poly
+                    conditions.extend(conds)
+                    functs.extend(polys)
 
 
         # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
@@ -197,7 +204,12 @@ class HashMap:
 
         x_vals.sort()
 
-        self.funct = np.piecewise()
+        for i in range(len(conditions)):
+            conditions[i] = lambda x: (conditions[i][0] < x < conditions[i][1])
+
+        assert len(conditions) == len(functs)
+
+        self.funct = np.piecewise(all_indices, conditions, functs, default=None)
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
@@ -259,7 +271,7 @@ class HashMap:
         index = sub("[^A-Za-z]", "", index)
         if len(index) == 0:
             raise IndexError("Only letter characters are allowed")
-        scaled_index = log(self.l1Hash(index), 10)
+        scaled_index = self.l1Hash(index)
         self.assert_safe()
         if len(self.array) == 0:
             raise IndexError("The Hash Map is empty")
