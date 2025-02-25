@@ -118,6 +118,8 @@ class HashMap:
                         # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
 
                         idx_start = 0
+                        if str(unformatted_indices[0])[backup_letters] == ".":
+                            backup_letters += 1
                         current_first_char = str(unformatted_indices[0])[backup_letters]
                         secondary_function_list = []
                         first_digits = [int(current_first_char)]
@@ -214,7 +216,7 @@ class HashMap:
         assert len(conditions) == len(functs)
 
         def piecewise(x, functions=functs, conditions=condition_functs):
-            return np.piecewise(x, conditions, functions)
+            return np.piecewise(np.int64(x), conditions, functions)
 
         self.funct = piecewise
 
@@ -289,7 +291,7 @@ class HashMap:
             
             result = self.funct(scaled_index)
             
-            if result is None:
+            if result is None or result.shape == ():
                 raise IndexError("The item is not in the array")
 
             item = self.array[round(result[0])]
