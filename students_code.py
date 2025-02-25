@@ -204,12 +204,16 @@ class HashMap:
 
         x_vals.sort()
 
+        condition_functs = []
         for i in range(len(conditions)):
-            conditions[i] = lambda x: (conditions[i][0] < x < conditions[i][1])
+            condition_functs.append(lambda x, low=conditions[i][0], high=conditions[i][1]: (low <= x <= high))
 
         assert len(conditions) == len(functs)
 
-        self.funct = np.piecewise(all_indices, conditions, functs, default=None)
+        def piecewise(x, functions=functs, conditions=condition_functs):
+            return np.piecewise(x, conditions, functions)
+
+        self.funct = piecewise
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
