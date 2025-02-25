@@ -93,8 +93,6 @@ class HashMap:
                 case _:
                     power = 0
                     MAX_POWER = 10
-                    error_arrays = [None for _ in range(MAX_POWER)]
-                    num_longest_continous = [None for _ in range(MAX_POWER)]
                     while power <= MAX_POWER:
                         coes = np.polyfit(indices, expected_indices, power)
                         polynomial =  np.poly1d(coes)
