@@ -1,10 +1,12 @@
 import numpy as np
-import multiprocessing
+import threading
 import warnings
 import string
 from random import randint, choice
 from time import time_ns
 from math import log
+from concurrent import futures
+from re import sub
 
 
 class WordPair:
@@ -20,6 +22,7 @@ class HashMap:
         # This array holds a list of indices
         self.index_array = []
         self.function_array = []
+        self.funct = None
         self.array = []
         self.size = 0
         self.supress_prints = False
@@ -27,8 +30,7 @@ class HashMap:
         self.polyThread = None
         self.threadActive = False
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: int("".join([str(ord(i.strip('’').upper())) for i in list(x)]))
-
+        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
     def add(self, item):
         """
         IDEAS TO SPEED UP
@@ -53,15 +55,18 @@ class HashMap:
         print(f"Updating formulas for {len(self.array)} items")
         self.array.sort(key=lambda x: self.l1Hash(x.word))
         self.assert_safe()
-        self.polyThread = multiprocessing.Process(target=self.calculate_regression, args=(self.index_array, ))
+        self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
         self.polyThread.start()
         self.threadActive = True
-
 
     def calculate_regression(self, lst):
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
+
+        conditions = [None for _ in lst]
+        functs = [None for _ in lst]
+        x_vals = [] # We can just sort this later and evetrything will be correct (presumably)
 
         def format_array(lst):
             lst.sort()
@@ -69,6 +74,7 @@ class HashMap:
             return np.log10(arr)
 
         def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
+            """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
             indices = format_array(unformatted_indices)
             match len(unformatted_indices):
                 case 1:
@@ -104,7 +110,7 @@ class HashMap:
                             # They all passed, so this polynomial works
                             return polynomial
                     else:
-                        # If we get here, that's bad. We couldn't get a polynomial to reliably work
+                        # If we get here, that's bad (we get here quite often). We couldn't get a polynomial to reliably work
                         # Further data processing is needed.
 
                         # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
@@ -153,8 +159,13 @@ class HashMap:
                         return returned_function
         
         def single_instance(idx, lst_to_use, offset):
+            """This function uses create_polynomial to map functions to the correct spots
+            It's seperate to allow multithreading
+            """
             # The indexing in the primary array is the offset (all the items in the lists before this one) + the result of the function
             
+            x_vals.extend(lst_to_use)
+
             match len(lst_to_use):
                 case 0:
                     self.function_array[idx] = None
@@ -174,14 +185,28 @@ class HashMap:
 
         # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
         # The get will go into the function array at the equivalent index array index, and then call it
-        with multiprocessing.Pool(10) as p:
-            p.map(single_instance, zip(range(len(lst)), lst, [sum(lst[:i]) for i in range(len(lst))]))
+        total = 0
+        functions = []
+        with futures.ThreadPoolExecutor() as executor:
+            for i, v in enumerate(lst):
+                functions.append(executor.submit(single_instance, i, v, total))
+                total += len(v)
+        
+        for i in functions:
+            i.result()
 
-    
+        x_vals.sort()
+
+        self.funct = np.piecewise()
+
     def soft_insert(self, item, count=1):
+        item = sub("[^A-Za-z]", "", item)
+        if len(item) == 0:
+            return
+        
         itemIndex = self.l1Hash(item)
         numberOfChars = len(item)
-
+        
         if numberOfChars-1 < len(self.index_array):
             # The array already contains item(s) of the same length
             self.array.append(WordPair(item, itemIndex, count))
@@ -202,8 +227,7 @@ class HashMap:
                 self.index_array.append([])
             self.index_array.append([itemIndex, ])
             self.function_array.append(lambda v: numberOfChars-1)
-
-            
+     
     def words_in(self, words):
         unique_words = sorted(list(set(words)))
         
@@ -220,7 +244,6 @@ class HashMap:
 
         return len(self.array), 0
                         
-    
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
         if self.threadActive:
@@ -233,6 +256,9 @@ class HashMap:
                 print(f"Thread finished in {(time_ns() - time)/1000000000} seconds")
 
     def __getitem__(self, index):
+        index = sub("[^A-Za-z]", "", index)
+        if len(index) == 0:
+            raise IndexError("Only letter characters are allowed")
         scaled_index = log(self.l1Hash(index), 10)
         self.assert_safe()
         if len(self.array) == 0:
@@ -241,23 +267,15 @@ class HashMap:
             # We take the base index, that will likely never have collisions, then run it through our approximated function
             # We calculated in the calculate_regression function
             # We need to check to make sure the item we got is the same as the one we request
-            funct = self.function_array[len(index)-1]
-            if funct is None:
-                raise IndexError("The item is not in the Hash Map")
             
-            result = funct(scaled_index)
-            if type(result) is tuple:
-                number_of_steps = result[1] + 2 # One for the function array lookup, then the main array lookup
-                value_to_check = round(result[0])
-            else:
-                number_of_steps = 2
-                value_to_check = round(result)
+            result = self.funct(scaled_index)
             
-            if value_to_check-1 > len(self.array):
-                raise IndexError("The item is not in the Hash Map")
-            item = self.array[value_to_check]
+            if result is None:
+                raise IndexError("The item is not in the array")
+
+            item = self.array[round(result)]
             if item.key == self.l1Hash(index):
-                return item, number_of_steps
+                return item, 1
             else:
                 raise IndexError("The item is not in the Hash Map, or there was a mismatch")
     
@@ -281,8 +299,8 @@ if __name__ == "__main__":
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
     
-    inwords = ["a", "a", "as", "at"]
-    #inwords = [generate_random_word() for _ in range(1000)]
+    #inwords = ["a", "a", "as", "at"]
+    inwords = [generate_random_word() for _ in range(10)]
     #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
