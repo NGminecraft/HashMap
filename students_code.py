@@ -30,7 +30,7 @@ class HashMap:
         self.polyThread = None
         self.threadActive = False
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
+        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)[:min(9, len(x))]]))
     def add(self, item):
         """
         IDEAS TO SPEED UP
@@ -80,6 +80,11 @@ class HashMap:
         def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
             """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
             indices = format_array(unformatted_indices)
+            for i in unformatted_indices[1:]:
+                if i != unformatted_indices[0]:
+                    break
+            else:
+                return [(unformatted_indices[0], unformatted_indices[0])], [lambda x: unformatted_indices[0]]
             match len(unformatted_indices):
                 case 1:
                      # If there is only one item, return it's index
@@ -118,8 +123,6 @@ class HashMap:
                         # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
 
                         idx_start = 0
-                        if str(unformatted_indices[0])[backup_letters] == ".":
-                            backup_letters += 1
                         current_first_char = str(unformatted_indices[0])[backup_letters]
                         secondary_function_list = []
                         first_digits = [int(current_first_char)]
@@ -215,8 +218,11 @@ class HashMap:
 
         assert len(conditions) == len(functs)
 
-        def piecewise(x, functions=functs, conditions=condition_functs):
-            return np.piecewise(np.int64(x), conditions, functions)
+        def piecewise(x, conds=condition_functs, functs=functs):
+            """Originally I was going to use np.piecewise, but it broke"""
+            for c, f in zip(conds, functs):
+                if c(x):
+                    return f(x)
 
         self.funct = piecewise
 
@@ -291,10 +297,10 @@ class HashMap:
             
             result = self.funct(scaled_index)
             
-            if result is None or result.shape == ():
+            if result is None:
                 raise IndexError("The item is not in the array")
 
-            item = self.array[round(result[0])]
+            item = self.array[round(result)]
             if item.key == self.l1Hash(index):
                 return item, 1
             else:
@@ -304,18 +310,18 @@ class HashMap:
         item = self.__getitem__(word)
         return item[0].number, item[1]
 
-test_hash = HashMap()
-finished = False
 
 def words_in(words):
+    test_hash = HashMap()
     words.sort()
-    return test_hash.words_in(words)
+    return test_hash.words_in(words), test_hash
 
-def lookup_word_count(word):
-    item = test_hash[word]
+def lookup_word_count(word, hash):
+    item = hash[word]
     return item[0].number, item[1]
 
 if __name__ == "__main__":
+    test = HashMap()
     def generate_random_word():
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
@@ -323,9 +329,9 @@ if __name__ == "__main__":
     #inwords = ["a", "a", "as", "at"]
     #inwords = [generate_random_word() for _ in range(10)]
     inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
-    words_in(inwords)
+    _, hsh = words_in(inwords)
     finished = True
     print("Output: ")
-    print("\n".join(" ".join([i, str(lookup_word_count(i))]) for i in sorted(inwords, key=lambda x: test_hash.l1Hash(x))))
+    print("\n".join(" ".join([i, str(lookup_word_count(i, hsh))]) for i in sorted(inwords, key=lambda x: test.l1Hash(x))))
     print("Done!")
     
