@@ -30,7 +30,7 @@ class HashMap:
         self.polyThread = None
         self.threadActive = False
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
+        self.l1Hash = lambda x: log(int("".join([str(ord(i.upper())) for i in list(x)])), 10)
     def add(self, item):
         """
         IDEAS TO SPEED UP
@@ -66,20 +66,23 @@ class HashMap:
 
         conditions = [None for _ in lst]
         functs = [None for _ in lst]
-        x_vals = [] # We can just sort this later and evetrything will be correct (presumably)
 
         def format_array(lst):
             lst.sort()
             arr = np.array(lst).astype(np.double)
             return np.log10(arr)
 
-        def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
+        def create_polynomial(unformatted_indices, expected_indices, backup_letters=0) -> tuple[list, list]:
             """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
+            unformatted_indices.sort()
+            if len(unformatted_indices) == 0:
+                return [], []
+            bound = (unformatted_indices[0], unformatted_indices[-1])
             indices = format_array(unformatted_indices)
             match len(unformatted_indices):
                 case 1:
                      # If there is only one item, return it's index
-                    return lambda x: expected_indices[0]
+                    return [bound], [lambda x: expected_indices[0]]
                 case 2:
                     
                     # I can actually do this, and this is probably a bit faster
@@ -89,7 +92,7 @@ class HashMap:
                     
                     def linear_function(x, m=slope, b=intercept):
                         return m * x + b
-                    return linear_function
+                    return [bound], [linear_function]
                 case _:
                     power = 0
                     MAX_POWER = 10
@@ -106,29 +109,34 @@ class HashMap:
                                 break # TODO, allow functions to map to only part of the data
                         else:
                             # They all passed, so this polynomial works
-                            return polynomial
+                            return [bound], [polynomial]
                     else:
                         # If we get here, that's bad (we get here quite often). We couldn't get a polynomial to reliably work
                         # Further data processing is needed.
 
                         # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
 
+                        formatted_indices = [round(i**10) for i in unformatted_indices]
+                        
                         idx_start = 0
-                        current_first_char = str(unformatted_indices[0])[backup_letters]
+                        current_first_char = str(formatted_indices[0])[backup_letters]
                         secondary_function_list = []
                         first_digits = [int(current_first_char)]
+                        bounds = []
 
-                        for i in range(1,len(unformatted_indices)):
-                            if str(unformatted_indices[i])[backup_letters] != current_first_char:
-                                func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
+                        for i in range(1,len(formatted_indices)):
+                            if str(formatted_indices[i])[backup_letters] != current_first_char:
+                                b, func = create_polynomial(formatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
                                 secondary_function_list.append(func)
+                                bounds.append(b)
 
                                 idx_start = i
-                                current_first_char = str(unformatted_indices[i])[backup_letters]
+                                current_first_char = str(formatted_indices[i])[backup_letters]
                                 first_digits.append(int(current_first_char))
                         else:
-                            func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
+                            b, func = create_polynomial(formatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
                             secondary_function_list.append(func)
+                            bounds.append(b)
                         
                         if backup_letters%2 == 0 and first_digits[0] >= 6:
                             normalizer = -6 # Only the first digit of each ascii letter can be shorted
@@ -136,25 +144,13 @@ class HashMap:
                         else:
                             normalizer = 0
 
+                        first_digits.sort()
+
                         final_function_list = [None for _ in range(first_digits[-1]+normalizer+1)]
                         for d, f in zip(first_digits, secondary_function_list):
                             final_function_list[d+normalizer] = f
-
-                
-                        def returned_function(x, f_list=final_function_list, num_digits=backup_letters, norm=normalizer):
-                            main_idx = round(10**x)
-                            first_digit = int(str(main_idx)[num_digits])
-                            funct = f_list[first_digit+norm]
-                            funct_result = funct(x)
-                            if type(funct_result) is tuple:
-                                value = funct_result[0]
-                                steps = funct_result[1] + 1
-                            else:
-                                value = funct_result
-                                steps = 1
-                            return value, steps
                         
-                        return returned_function
+                        return bounds, secondary_function_list
         
         def single_instance(idx, lst_to_use, offset):
             """This function uses create_polynomial to map functions to the correct spots
@@ -162,23 +158,18 @@ class HashMap:
             """
             # The indexing in the primary array is the offset (all the items in the lists before this one) + the result of the function
             
-            x_vals.extend(lst_to_use)
 
             match len(lst_to_use):
-                case 0:
-                    self.function_array[idx] = None
                 case 1:
-                    def return_const(x, const=offset):
-                        """A lambda didn't work for some reason"""
-                        return const
-                
-                    self.function_array[idx] = return_const # Just return the offset if everything works
+                    conditions.append((lst_to_use[0], lst_to_use[0]))
+                    functs.append(lambda x: offset) # Just return the offset if everything works
                 case _:
                     expected_indices = [i for i in range(offset, offset+len(lst_to_use))] # This forgoes needing to manually add, or change the polynomial
                     
-                    poly = create_polynomial(lst_to_use, expected_indices)
+                    b, poly = create_polynomial(lst_to_use, expected_indices)
 
-                    self.function_array[idx] = poly
+                    functs.extend(poly)
+                    conditions.extend(b)
 
 
         # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
@@ -193,9 +184,13 @@ class HashMap:
         for i in functions:
             i.result()
 
-        x_vals.sort()
+        for i in range(len(conditions)):
+            conditions[i] = lambda x: (conditions[i][0] <= x <= conditions[i][1])
 
-        self.funct = np.piecewise()
+        def piecewise(x, conds=conditions, funs=functs):
+            return np.piecewise(x, conds, funs)[0]
+        
+        self.funct = piecewise
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
@@ -257,9 +252,9 @@ class HashMap:
         index = sub("[^A-Za-z]", "", index)
         if len(index) == 0:
             raise IndexError("Only letter characters are allowed")
-        scaled_index = log(self.l1Hash(index), 10)
+        scaled_index = self.l1Hash(index)
         self.assert_safe()
-        if len(self.array) == 0:
+        if len(self.array) == 0 or self.funct is None:
             raise IndexError("The Hash Map is empty")
         else:
             # We take the base index, that will likely never have collisions, then run it through our approximated function
