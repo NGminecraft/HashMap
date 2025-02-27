@@ -21,7 +21,6 @@ class HashMap:
         warnings.simplefilter('ignore') # These are obnoxious, and an expected, so we'll just get rid of them
         # This array holds a list of indices
         self.index_array = []
-        self.function_array = []
         self.funct = None
         self.array = []
         self.size = 0
@@ -64,186 +63,27 @@ class HashMap:
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
 
-        all_indices = []
-        for i in lst:
-            all_indices.extend(i)
-
-        conditions = []
-        functs = []
-        x_vals = [] # We can just sort this later and evetrything will be correct (presumably)
-
-        def format_array(lst):
-            lst.sort()
-            arr = np.array(lst).astype(np.double)
-            return arr
-
-        def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
-            """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
-            def lagrange_coefficents(x_vals, y_vals):
-                n = len(x_vals)
-                coefficents = [0] * n
-                for i in range(n):
-                    basis_coeffs = [1]
-                    for j in range(n):
-                        if i != j:
-                            denom = x_vals[i] - x_vals[j]
-                            new_basis = []
-                            for coeff in basis_coeffs:
-                                new_basis.append(coeff/denom)
-                            new_basis[0] + new_basis
-                            for k in range(len(basis_coeffs)):
-                                new_basis[k] -= x_vals[j] * basis_coeffs[k] / denom
-                            basis_coeffs = new_basis
-                    for k in range(n):
-                        coefficents[k] += y_vals[i] * basis_coeffs[k]
-                return coefficents[::-1]
-                
-            indices = format_array(unformatted_indices)
-            for i in unformatted_indices[1:]:
-                if i != unformatted_indices[0]:
-                    break
-            else:
-                return [(unformatted_indices[0], unformatted_indices[0])], [lambda x: unformatted_indices[0]]
-            match len(unformatted_indices):
-                case 1:
-                     # If there is only one item, return it's index
-                    return [(unformatted_indices[0], unformatted_indices[-1])], [lambda x: expected_indices[0]]
-                case 2:
-                    
-                    # I can actually do this, and this is probably a bit faster
-                    slope = (expected_indices[1]- expected_indices[0])/(indices[1]-indices[0])
-
-                    intercept = expected_indices[0] - (slope * indices[0])
-                    
-                    def linear_function(x, m=slope, b=intercept):
-                        return m * x + b
-                    return [(unformatted_indices[0], unformatted_indices[-1])], [linear_function, ]
-                case _:
-                    power = 0
-                    MAX_POWER = 10
-                    while power <= MAX_POWER:
-                        coes = np.polyfit(indices, expected_indices, power)
-                        polynomial =  np.poly1d(coes)
-                        # Ok now we need to check and make sure the polynomial actually fits well enough
-                        for each_key, expected_output in zip(indices, expected_indices):
-                            returned = polynomial(each_key)
-                            # If any fail, we know that we need to refit
-                            error = abs(returned-expected_output)
-                            if error > 0.49: # I originally just used round(returned) != expected_output, but was running into what I think is floating point error
-                                power+=1
-                                break # TODO, allow functions to map to only part of the data
-                        else:
-                            # They all passed, so this polynomial works
-                            return [(unformatted_indices[0], unformatted_indices[-1])], [polynomial, ]
-                    else:
-                        # If we get here, that's bad (we get here quite often). We couldn't get a polynomial to reliably work
-                        # Further data processing is needed.
-
-                        # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
-
-                        idx_start = 0
-                        current_first_char = str(unformatted_indices[0])[backup_letters]
-                        secondary_function_list = []
-                        first_digits = [int(current_first_char)]
-
-                        locations = []
-
-
-                        for i in range(1,len(unformatted_indices)):
-                            if str(unformatted_indices[i])[backup_letters] != current_first_char:
-                                loc, func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
-                                secondary_function_list.extend(func)
-                                locations.extend(loc)
-
-                                idx_start = i
-                                current_first_char = str(unformatted_indices[i])[backup_letters]
-                                first_digits.append(int(current_first_char))
-                        else:
-                            loc, func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
-                            secondary_function_list.extend(func)
-                            locations.extend(loc)
-                        
-                        """
-                        if backup_letters%2 == 0 and first_digits[0] >= 6:
-                            normalizer = -6 # Only the first digit of each ascii letter can be shorted
-                            # It starts at A, 65, but we can have a 70, and thus can't minus 6 if were looking at the second digit
-                        else:
-                            normalizer = 0
-
-                        final_function_list = [None for _ in range(first_digits[-1]+normalizer+1)]
-                        for d, f in zip(first_digits, secondary_function_list):
-                            final_function_list[d+normalizer] = f
-
-                
-                        def returned_function(x, f_list=final_function_list, num_digits=backup_letters, norm=normalizer):
-                            main_idx = round(10**x)
-                            first_digit = int(str(main_idx)[num_digits])
-                            funct = f_list[first_digit+norm]
-                            funct_result = funct(x)
-                            if type(funct_result) is tuple:
-                                value = funct_result[0]
-                                steps = funct_result[1] + 1
-                            else:
-                                value = funct_result
-                                steps = 1
-                            return value, steps
-                        """
-                        return locations, secondary_function_list
-
-        def single_instance(idx, lst_to_use, offset):
-            """This function uses create_polynomial to map functions to the correct spots
-            It's seperate to allow multithreading
-            """
-            # The indexing in the primary array is the offset (all the items in the lists before this one) + the result of the function
+        def lagrange_coefficents(x_vals, y_vals):
+            n = len(x_vals)
+            coefficents = [0] * n
+            for i in range(n):
+                basis_coeffs = [1]
+                for j in range(n):
+                    if i != j:
+                        denom = x_vals[i] - x_vals[j]
+                        new_basis = []
+                        for coeff in basis_coeffs:
+                            new_basis.append(coeff/denom)
+                        new_basis[0] + new_basis
+                        for k in range(len(basis_coeffs)):
+                            new_basis[k] -= x_vals[j] * basis_coeffs[k] / denom
+                        basis_coeffs = new_basis
+                for k in range(n):
+                    coefficents[k] += y_vals[i] * basis_coeffs[k]
+            return coefficents[::-1]
             
-            x_vals.extend(lst_to_use)
-
-            match len(lst_to_use):
-                case 0:
-                    pass
-
-                case 1:
-                    conditions.append((lst_to_use[0], lst_to_use[-1]))
-                    functs.append(lambda x: offset) # Just return the offset if everything works
-                case _:
-                    expected_indices = [i for i in range(offset, offset+len(lst_to_use))] # This forgoes needing to manually add, or change the polynomial
-                    
-                    conds, polys = create_polynomial(lst_to_use, expected_indices)
-
-                    conditions.extend(conds)
-                    functs.extend(polys)
-
-
-        # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
-        # The get will go into the function array at the equivalent index array index, and then call it
-        total = 0
-        functions = []
-        with futures.ThreadPoolExecutor() as executor:
-            for i, v in enumerate(lst):
-                functions.append(executor.submit(single_instance, i, v, total))
-                total += len(v)
-        
-        for i in functions:
-            i.result()
-
-        x_vals.sort()
-
-        condition_functs = []
-        for i in range(len(conditions)):
-            if type(conditions[i]) is list:
-                conditions[i] = conditions[i][0]
-            assert type(conditions[i]) is tuple
-            condition_functs.append(lambda x, low=conditions[i][0], high=conditions[i][1]: (low <= x <= high))
-
-        assert len(conditions) == len(functs)
-
-        def piecewise(x, conds=condition_functs, functs=functs):
-            """Originally I was going to use np.piecewise, but it broke"""
-            for c, f in zip(conds, functs):
-                if c(x):
-                    return f(x)
-
-        self.funct = piecewise
+        coes = lagrange_coefficents(lst, list(range(len(lst))))
+        self.funct = np.poly1d(coes)
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
