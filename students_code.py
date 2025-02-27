@@ -4,9 +4,8 @@ import warnings
 import string
 from random import randint, choice
 from time import time_ns
-from math import log
-from concurrent import futures
 from re import sub
+from math import log
 
 
 class WordPair:
@@ -54,34 +53,28 @@ class HashMap:
         print(f"Updating formulas for {len(self.array)} items")
         self.array.sort(key=lambda x: self.l1Hash(x.word))
         self.assert_safe()
-        self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
+        self.polyThread = threading.Thread(target=self.calculate_regression)
         self.polyThread.start()
         self.threadActive = True
 
-    def calculate_regression(self, lst):
+    def calculate_regression(self):
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
 
+        lst = [log(i.key, 10) for i in self.array]
+
         def lagrange_coefficents(x_vals, y_vals):
             n = len(x_vals)
-            coefficents = [0] * n
+            coeffs = np.poly1d([0])
             for i in range(n):
-                basis_coeffs = [1]
+                p = np.poly1d([1])
                 for j in range(n):
                     if i != j:
-                        denom = x_vals[i] - x_vals[j]
-                        new_basis = []
-                        for coeff in basis_coeffs:
-                            new_basis.append(coeff/denom)
-                        new_basis[0] + new_basis
-                        for k in range(len(basis_coeffs)):
-                            new_basis[k] -= x_vals[j] * basis_coeffs[k] / denom
-                        basis_coeffs = new_basis
-                for k in range(n):
-                    coefficents[k] += y_vals[i] * basis_coeffs[k]
-            return coefficents[::-1]
-            
+                        p *= np.poly1d([1, -x_vals[j]]) / (x_vals[i] - x_vals[j])
+                coeffs += p * y_vals[i]
+            return coeffs
+
         coes = lagrange_coefficents(lst, list(range(len(lst))))
         self.funct = np.poly1d(coes)
 
@@ -91,28 +84,8 @@ class HashMap:
             return
         
         itemIndex = self.l1Hash(item)
-        numberOfChars = len(item)
-        
-        if numberOfChars-1 < len(self.index_array):
-            # The array already contains item(s) of the same length
-            self.array.append(WordPair(item, itemIndex, count))
-            self.index_array[numberOfChars-1].append(itemIndex)
-                
-        elif numberOfChars-1 == len(self.index_array):
-            # The array is the same size, so we can just add this to the end
-            self.function_array.append(lambda v: numberOfChars-1)
-            self.array.append(WordPair(item, itemIndex, count))
-            self.index_array.append([itemIndex, ])
-                
-        elif numberOfChars-1 > len(self.index_array):
-            # We need to scale the array to add this to the right spot
-
-            self.array.append(WordPair(item, itemIndex, count))
-            self.function_array.extend([None]*(numberOfChars-1-len(self.function_array)))
-            for i in range(numberOfChars-1-len(self.index_array)):
-                self.index_array.append([])
-            self.index_array.append([itemIndex, ])
-            self.function_array.append(lambda v: numberOfChars-1)
+        self.array.append(WordPair(item, itemIndex, count))
+        self.array.sort(key=lambda x: x.key)
      
     def words_in(self, words):
         unique_words = sorted(list(set(words)))
@@ -145,7 +118,7 @@ class HashMap:
         index = sub("[^A-Za-z]", "", index)
         if len(index) == 0:
             raise IndexError("Only letter characters are allowed")
-        scaled_index = self.l1Hash(index)
+        scaled_index = log(self.l1Hash(index),10)
         self.assert_safe()
         if len(self.array) == 0:
             raise IndexError("The Hash Map is empty")
@@ -182,7 +155,7 @@ def lookup_word_count(word, hash):
 if __name__ == "__main__":
     test = HashMap()
     def generate_random_word():
-        return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
+        return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 8))])
         
     
     #inwords = ["a", "a", "as", "at"]
@@ -193,4 +166,4 @@ if __name__ == "__main__":
     print("Output: ")
     print("\n".join(" ".join([i, str(lookup_word_count(i, hsh))]) for i in sorted(inwords, key=lambda x: test.l1Hash(x))))
     print("Done!")
-    
+
