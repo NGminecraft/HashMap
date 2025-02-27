@@ -15,15 +15,13 @@ class funct_model(nn.Module):
     def __init__(self):
         super(funct_model, self) .__init__()
         self.model = nn.Sequential(
-            nn.Linear(1, 32),
-            nn.ReLU(),
-            nn.Linear(32, 64),
-            nn.ReLU(),
-            nn.Linear(64,64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Linear(1, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, 32),
+            nn.LeakyReLU(),
+            nn.Linear(32, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, 1)
         )
 
     def forward(self, x):
