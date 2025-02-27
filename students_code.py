@@ -79,6 +79,25 @@ class HashMap:
 
         def create_polynomial(unformatted_indices, expected_indices, backup_letters=0):
             """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
+            def lagrange_coefficents(x_vals, y_vals):
+                n = len(x_vals)
+                coefficents = [0] * n
+                for i in range(n):
+                    basis_coeffs = [1]
+                    for j in range(n):
+                        if i != j:
+                            denom = x_vals[i] - x_vals[j]
+                            new_basis = []
+                            for coeff in basis_coeffs:
+                                new_basis.append(coeff/denom)
+                            new_basis[0] + new_basis
+                            for k in range(len(basis_coeffs)):
+                                new_basis[k] -= x_vals[j] * basis_coeffs[k] / denom
+                            basis_coeffs = new_basis
+                    for k in range(n):
+                        coefficents[k] += y_vals[i] * basis_coeffs[k]
+                return coefficents[::-1]
+                
             indices = format_array(unformatted_indices)
             for i in unformatted_indices[1:]:
                 if i != unformatted_indices[0]:
