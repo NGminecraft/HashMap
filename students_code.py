@@ -64,8 +64,8 @@ class HashMap:
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
 
-        conditions = [None for _ in lst]
-        functs = [None for _ in lst]
+        conditions = []
+        functs = []
 
         def format_array(lst):
             lst.sort()
@@ -126,7 +126,7 @@ class HashMap:
 
                         for i in range(1,len(formatted_indices)):
                             if str(formatted_indices[i])[backup_letters] != current_first_char:
-                                b, func = create_polynomial(formatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
+                                b, func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
                                 secondary_function_list.append(func)
                                 bounds.append(b)
 
@@ -134,7 +134,7 @@ class HashMap:
                                 current_first_char = str(formatted_indices[i])[backup_letters]
                                 first_digits.append(int(current_first_char))
                         else:
-                            b, func = create_polynomial(formatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
+                            b, func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
                             secondary_function_list.append(func)
                             bounds.append(b)
                         
@@ -185,10 +185,11 @@ class HashMap:
             i.result()
 
         for i in range(len(conditions)):
-            conditions[i] = lambda x: (conditions[i][0] <= x <= conditions[i][1])
+            if conditions:
+                conditions[i] = lambda x, low=conditions[i][0], high=conditions[i][-1]: (low <= x <= high)
 
         def piecewise(x, conds=conditions, funs=functs):
-            return np.piecewise(x, conds, funs)[0]
+            return np.piecewise(np.array([x]), conds, funs)[0]
         
         self.funct = piecewise
 
@@ -292,8 +293,8 @@ if __name__ == "__main__":
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
     
-    #inwords = ["a", "a", "as", "at"]
-    inwords = [generate_random_word() for _ in range(10)]
+    inwords = ["a", "a", "as", "at"]
+    #inwords = [generate_random_word() for _ in range(10)]
     #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
