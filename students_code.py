@@ -77,7 +77,7 @@ class HashMap:
         def barycentric(x_vals, y_vals):
             n = len(x_vals)
             
-            def bartcentric_weights(xs):
+            def barycentric_weights(xs):
                 weights = [1] * n
 
                 for i in range(n):
@@ -90,19 +90,19 @@ class HashMap:
                 for k in range(n):
                     if j != k:
                         denom = xs[j] - xs[k]
-                        new_basis = 0 + [c / denom for c in basis_coeffs]
+                        new_basis = [0] + [c / denom for c in basis_coeffs]
                         for l in range(len(basis_coeffs)):
-                            new_basis[k] -= (xs[k] * basis_coeffs[l]) / denom
+                            new_basis[l] -= (xs[k] * basis_coeffs[l]) / denom
                         basis_coeffs = new_basis
                 return basis_coeffs
             
-            weights = bartcentric_weights(x_vals)
+            weights = barycentric_weights(x_vals)
             coes = [0] * n
             for i in range(n):
                 basis_coeffs = expand_poly(x_vals, i)
                 for k in range(n):
                     coes[k] += y_vals[i] * weights[i] * basis_coeffs[k]
-            return coes[::-1]
+            return coes
         
         """
         def barycentric(x_vals, y_vals):
@@ -133,7 +133,12 @@ class HashMap:
             
 
         coes = barycentric(lst, list(range(len(lst))))
-        self.funct = None
+        def polynomial(x, coefficents=coes):
+            result = 0
+            for i, v in coefficents:
+                result += v * x ** 2
+            return result
+        self.funct = polynomial
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
