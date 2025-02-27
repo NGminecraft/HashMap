@@ -7,6 +7,28 @@ from time import time_ns
 from math import log
 from concurrent import futures
 from re import sub
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+class funct_model(nn.Module):
+    def __init__(self):
+        super(funct_model, self) .__init__()
+        self.model = nn.Sequential(
+            nn.Linear(1, 32),
+            nn.ReLU(),
+            nn.Linear(32, 64),
+            nn.ReLU(),
+            nn.Linear(64,64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
+
+    def forward(self, x):
+        return self.model(x)
+    
 
 
 class WordPair:
@@ -21,16 +43,21 @@ class HashMap:
         warnings.simplefilter('ignore') # These are obnoxious, and an expected, so we'll just get rid of them
         # This array holds a list of indices
         self.index_array = []
-        self.function_array = []
-        self.funct = None
         self.array = []
         self.size = 0
-        self.supress_prints = False
+
+        self.return_zero = False
+
+        self.indices = []
+        self.indices_min = None
+        self.indices_range = 0
 
         self.polyThread = None
         self.threadActive = False
         # Not really meant to be changed, for debugging
-        self.l1Hash = lambda x: log(int("".join([str(ord(i.upper())) for i in list(x)])), 10)
+        self.l1Hash = lambda x: int("".join([str(ord(i.upper())) for i in list(x)]))
+        
+        self.criterion = nn.MSELoss()
     def add(self, item):
         """
         IDEAS TO SPEED UP
@@ -55,172 +82,70 @@ class HashMap:
         print(f"Updating formulas for {len(self.array)} items")
         self.array.sort(key=lambda x: self.l1Hash(x.word))
         self.assert_safe()
-        self.polyThread = threading.Thread(target=self.calculate_regression, args=(self.index_array, ))
+        """
+        self.polyThread = threading.Thread(target=self.calculate_regression)
         self.polyThread.start()
         self.threadActive = True
+        """
+        self.calculate_regression()
 
-    def calculate_regression(self, lst):
+    def calculate_regression(self):
         """ This function takes a list and then uses numpy to find a polynomial function that closely models the list
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
-
-        conditions = []
-        functs = []
-
-        def format_array(lst):
-            lst.sort()
-            arr = np.array(lst).astype(np.double)
-            return np.log10(arr)
-
-        def create_polynomial(unformatted_indices, expected_indices, backup_letters=0) -> tuple[list, list]:
-            """Takes numbers, and what they need to be mapped too then goes and makes a function for it"""
-            unformatted_indices.sort()
-            if len(unformatted_indices) == 0:
-                return [], []
-            bound = (unformatted_indices[0], unformatted_indices[-1])
-            indices = format_array(unformatted_indices)
-            match len(unformatted_indices):
-                case 1:
-                     # If there is only one item, return it's index
-                    return [bound], [lambda x: expected_indices[0]]
-                case 2:
-                    
-                    # I can actually do this, and this is probably a bit faster
-                    slope = (expected_indices[1]- expected_indices[0])/(indices[1]-indices[0])
-
-                    intercept = expected_indices[0] - (slope * indices[0])
-                    
-                    def linear_function(x, m=slope, b=intercept):
-                        return m * x + b
-                    return [bound], [linear_function]
-                case _:
-                    power = 0
-                    MAX_POWER = 10
-                    while power <= MAX_POWER:
-                        coes = np.polyfit(indices, expected_indices, power)
-                        polynomial =  np.poly1d(coes)
-                        # Ok now we need to check and make sure the polynomial actually fits well enough
-                        for each_key, expected_output in zip(indices, expected_indices):
-                            returned = polynomial(each_key)
-                            # If any fail, we know that we need to refit
-                            error = abs(returned-expected_output)
-                            if error > 0.49: # I originally just used round(returned) != expected_output, but was running into what I think is floating point error
-                                power+=1
-                                break # TODO, allow functions to map to only part of the data
-                        else:
-                            # They all passed, so this polynomial works
-                            return [bound], [polynomial]
-                    else:
-                        # If we get here, that's bad (we get here quite often). We couldn't get a polynomial to reliably work
-                        # Further data processing is needed.
-
-                        # Probably repeat the same algorithm, but chunk the words by the first digit of the index, instead of just word legnth
-
-                        formatted_indices = [round(i**10) for i in unformatted_indices]
-                        
-                        idx_start = 0
-                        current_first_char = str(formatted_indices[0])[backup_letters]
-                        secondary_function_list = []
-                        first_digits = [int(current_first_char)]
-                        bounds = []
-
-                        for i in range(1,len(formatted_indices)):
-                            if str(formatted_indices[i])[backup_letters] != current_first_char:
-                                b, func = create_polynomial(unformatted_indices[idx_start:i], expected_indices[idx_start:i], backup_letters+1)
-                                secondary_function_list.append(func)
-                                bounds.append(b)
-
-                                idx_start = i
-                                current_first_char = str(formatted_indices[i])[backup_letters]
-                                first_digits.append(int(current_first_char))
-                        else:
-                            b, func = create_polynomial(unformatted_indices[idx_start:], expected_indices[idx_start:], backup_letters+1)
-                            secondary_function_list.append(func)
-                            bounds.append(b)
-                        
-                        if backup_letters%2 == 0 and first_digits[0] >= 6:
-                            normalizer = -6 # Only the first digit of each ascii letter can be shorted
-                            # It starts at A, 65, but we can have a 70, and thus can't minus 6 if were looking at the second digit
-                        else:
-                            normalizer = 0
-
-                        first_digits.sort()
-
-                        final_function_list = [None for _ in range(first_digits[-1]+normalizer+1)]
-                        for d, f in zip(first_digits, secondary_function_list):
-                            final_function_list[d+normalizer] = f
-                        
-                        return bounds, secondary_function_list
         
-        def single_instance(idx, lst_to_use, offset):
-            """This function uses create_polynomial to map functions to the correct spots
-            It's seperate to allow multithreading
-            """
-            # The indexing in the primary array is the offset (all the items in the lists before this one) + the result of the function
-            
-
-            match len(lst_to_use):
-                case 1:
-                    conditions.append((lst_to_use[0], lst_to_use[0]))
-                    functs.append(lambda x: offset) # Just return the offset if everything works
-                case _:
-                    expected_indices = [i for i in range(offset, offset+len(lst_to_use))] # This forgoes needing to manually add, or change the polynomial
-                    
-                    b, poly = create_polynomial(lst_to_use, expected_indices)
-
-                    functs.extend(poly)
-                    conditions.extend(b)
-
-
-        # lst is a list of lists. Each item in the list is a list of each words hash, split by word size
-        # The get will go into the function array at the equivalent index array index, and then call it
-        total = 0
-        functions = []
-        with futures.ThreadPoolExecutor() as executor:
-            for i, v in enumerate(lst):
-                functions.append(executor.submit(single_instance, i, v, total))
-                total += len(v)
+        self.model = funct_model()
+        self.optimizer = optim.Adam(self.model.parameters(), lr = 0.01)
         
-        for i in functions:
-            i.result()
+        indices_normalized = [(i-self.indices_min)/self.indices_range for i in self.indices]
 
-        for i in range(len(conditions)):
-            if conditions:
-                conditions[i] = lambda x, low=conditions[i][0], high=conditions[i][-1]: (low <= x <= high)
+        expected_indices = range(len(self.array))
 
-        def piecewise(x, conds=conditions, funs=functs):
-            return np.piecewise(np.array([x]), conds, funs)[0]
+        MAX_ERROR = 0.4 # Maximum error
+        TOLERANCE = 5 # Number of times after it's first pass it needs to succeed
+        tolerance_epochs = 0
+
+        in_indices_t = torch.tensor(indices_normalized, dtype=torch.float32).view(-1, 1)
+        exp_indices_t = torch.tensor(expected_indices, dtype=torch.float32).view(-1)
+
+        while True:
+            self.optimizer.zero_grad()
+            in_predicted = self.model(in_indices_t)
+            loss = self.criterion(in_predicted, exp_indices_t)
+            loss.backward()
+            self.optimizer.step()
+
+            with torch.no_grad():
+                error = torch.max(torch.abs(in_predicted - exp_indices_t)).item()
+            print(error)
+
+            if error < MAX_ERROR:
+                tolerance_epochs += 1
+                if tolerance_epochs >= TOLERANCE:
+                    break
+            else:
+                tolerance_epochs += 1
+
         
-        self.funct = piecewise
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
         if len(item) == 0:
             return
         
-        itemIndex = self.l1Hash(item)
-        numberOfChars = len(item)
-        
-        if numberOfChars-1 < len(self.index_array):
-            # The array already contains item(s) of the same length
-            self.array.append(WordPair(item, itemIndex, count))
-            self.index_array[numberOfChars-1].append(itemIndex)
-                
-        elif numberOfChars-1 == len(self.index_array):
-            # The array is the same size, so we can just add this to the end
-            self.function_array.append(lambda v: numberOfChars-1)
-            self.array.append(WordPair(item, itemIndex, count))
-            self.index_array.append([itemIndex, ])
-                
-        elif numberOfChars-1 > len(self.index_array):
-            # We need to scale the array to add this to the right spot
+        item_index = self.l1Hash(item)
 
-            self.array.append(WordPair(item, itemIndex, count))
-            self.function_array.extend([None]*(numberOfChars-1-len(self.function_array)))
-            for i in range(numberOfChars-1-len(self.index_array)):
-                self.index_array.append([])
-            self.index_array.append([itemIndex, ])
-            self.function_array.append(lambda v: numberOfChars-1)
+        self.array.append(WordPair(item, item_index, count))
+        self.indices.append(item_index)
+        if not self.indices_min:
+            self.indices_min = item_index
+        elif item_index < self.indices_min and len(self.array) != 1:
+            self.return_zero = False
+            self.indices_min = item_index
+        elif len(self.array) == 1:
+            self.return_zero = True
+        self.indices_range = max(self.indices) - self.indices_min
+
      
     def words_in(self, words):
         unique_words = sorted(list(set(words)))
@@ -241,13 +166,11 @@ class HashMap:
     def assert_safe(self):
         """ This method checks to make sure that the regression function finished"""
         if self.threadActive:
-            if not self.supress_prints:
-                print("Waiting for regression thread to finish")
+            print("Waiting for regression thread to finish")
             time = time_ns()
             self.polyThread.join()
             self.threadActive = False
-            if not self.supress_prints:
-                print(f"Thread finished in {(time_ns() - time)/1000000000} seconds")
+            print(f"Thread finished in {(time_ns() - time)/1000000000} seconds")
 
     def __getitem__(self, index):
         index = sub("[^A-Za-z]", "", index)
@@ -255,19 +178,29 @@ class HashMap:
             raise IndexError("Only letter characters are allowed")
         scaled_index = self.l1Hash(index)
         self.assert_safe()
-        if len(self.array) == 0 or self.funct is None:
+        if len(self.array) == 0:
             raise IndexError("The Hash Map is empty")
         else:
             # We take the base index, that will likely never have collisions, then run it through our approximated function
             # We calculated in the calculate_regression function
             # We need to check to make sure the item we got is the same as the one we request
             
-            result = self.funct(scaled_index)
+            if self.return_zero:
+                if index == self.array[0].word:
+                    return self.array[0], 1
+                else:
+                    raise IndexError("Item not in list")
+
+            result = self.model(torch.tensor([scaled_index], dtype=torch.float32).view(1, 1))
             
+
+            _, predicted_class = torch.max(result, dim=1)
+            predicted_class = predicted_class.item()
+
             if result is None:
                 raise IndexError("The item is not in the array")
 
-            item = self.array[round(result)]
+            item = self.array[predicted_class]
             if item.key == self.l1Hash(index):
                 return item, 1
             else:
@@ -293,8 +226,8 @@ if __name__ == "__main__":
         return ''.join([choice(string.ascii_lowercase) for _ in range(randint(1, 15))])
         
     
-    inwords = ["a", "a", "as", "at"]
-    #inwords = [generate_random_word() for _ in range(10)]
+    #inwords = ["a", "a", "as", "at"]
+    inwords = [generate_random_word() for _ in range(100)]
     #inwords = ['g', 'n', 'n', 'hp', 'ij', 'md', 'ra', 'so', 'ty', 'xu', 'drd', 'fhj', 'gyg', 'hih', 'mfk', 'pae', 'umc', 'xfk', 'zee', 'cxou', 'iwld', 'pdiw', 'zovk', 'clyeb', 'efjsw', 'gxvwc', 'wjoaa', 'yxxut', 'zxrnn', 'etmlxo', 'fthzoy', 'ichyvk', 'jenazu', 'nauwew', 'noimfc', 'bvvxnxy', 'cjemair', 'etqdcxt', 'hqwdqwy', 'thlmfrt', 'busivlqg', 'cfiypojm', 'dygpsqae', 'dzmqapfz', 'gzzhtrfz', 'ijikhyik', 'iwcejujv', 'jeviteai', 'wacbjbgu', 'jsnljcsbl', 'wynnqimrf', 'zajxxsoyl', 'lbwrppygrf', 'nceakmbixb', 'pkikkfxwlq', 'pouzguexyb', 'rxeneqraeg', 'scaqrxfnbl', 'slxybsnqjg', 'vdqrmlhazb', 'ypalccnbqb', 'cnwkpgoqybz', 'jmlmrywfhfx', 'jrsqrmtapse', 'kpulqqoowke', 'ldutizxiwad', 'ndvyrivxgdb', 'vbvjlifparc', 'dhjklzdazgpg', 'irgerzyfassi', 'reahnbgvkpro', 'ucokdsosmeeo', 'xinmxqjbweik', 'aaeuxpgyuoxcl', 'bhwcmrlyngjwa', 'ctavuaziyaafd', 'ddajvmfhjdpqv', 'drrslvcboezlc', 'hdpptoamcjgtr', 'kmqvqmzowbknv', 'liyqlbuxveadq', 'ydmtegpfhqiay', 'dcvlmlogruamud', 'dyzavdxmywmczn', 'edureokkyvvddv', 'fredpmyenviqdm', 'fznnqbfracwrsb', 'gyptnhcqtxfjwf', 'hhhemhumvpxgxo', 'ivngvcmibhedvo', 'nsxfyebfbywddn', 'ponrfhqorynrfe', 'pqhowqpnwzurse', 'stfwtfvprikmjl', 'udctpexupkbxdz', 'hgptibmszdbkaaf', 'rhcxvbggscymcyf', 'xkiowecbuawlwbt', 'yvefzsvpqbjqrlt', 'zmfvryuuvkzsfki']
     words_in(inwords)
     finished = True
