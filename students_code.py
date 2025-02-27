@@ -16,8 +16,7 @@ class WordPair:
 
 
 class HashMap:
-    def __init__(self):
-        warnings.simplefilter('ignore') # These are obnoxious, and an expected, so we'll just get rid of them
+    def __init__(self): # These are obnoxious, and an expected, so we'll just get rid of them
         # This array holds a list of indices
         self.index_array = []
         self.funct = None
@@ -62,7 +61,7 @@ class HashMap:
         The X axis is the values passed in, the Y axis are the indices from 0, len(lst)
         """
 
-        lst = [log(i.key, 10) for i in self.array]
+        lst = [i.key for i in self.array]
 
         def lagrange_coefficents(x_vals, y_vals):
             n = len(x_vals)
@@ -74,9 +73,67 @@ class HashMap:
                         p *= np.poly1d([1, -x_vals[j]]) / (x_vals[i] - x_vals[j])
                 coeffs += p * y_vals[i]
             return coeffs
+        
+        def barycentric(x_vals, y_vals):
+            n = len(x_vals)
+            
+            def bartcentric_weights(xs):
+                weights = [1] * n
 
-        coes = lagrange_coefficents(lst, list(range(len(lst))))
-        self.funct = np.poly1d(coes)
+                for i in range(n):
+                    for j in range(n):
+                        if i != j:
+                            weights[i] /= (xs[i]-xs[j])
+                return weights
+            def expand_poly(xs, j):
+                basis_coeffs = [1]
+                for k in range(n):
+                    if j != k:
+                        denom = xs[j] - xs[k]
+                        new_basis = 0 + [c / denom for c in basis_coeffs]
+                        for l in range(len(basis_coeffs)):
+                            new_basis[k] -= (xs[k] * basis_coeffs[l]) / denom
+                        basis_coeffs = new_basis
+                return basis_coeffs
+            
+            weights = bartcentric_weights(x_vals)
+            coes = [0] * n
+            for i in range(n):
+                basis_coeffs = expand_poly(x_vals, i)
+                for k in range(n):
+                    coes[k] += y_vals[i] * weights[i] * basis_coeffs[k]
+            return coes[::-1]
+        
+        """
+        def barycentric(x_vals, y_vals):
+            def barycentric_weights(xs):
+                weights = np.ones(n)
+
+                for i in range(n):
+                    weights[i] /= np.prod(xs[i]-np.delete(xs, i))
+                return weights
+
+            def expand_basis_polynomial(xs, j):
+                excluded_x = np.delete(xs, j)
+                basis_poly = np.poly(excluded_x)
+                denom = np.prod(xs[i] - excluded_x)
+                return basis_poly / denom
+            
+            x_vals, y_vals = np.array(x_vals), np.array(y_vals)
+            n = len(x_vals)
+            wghts = barycentric_weights(x_vals)
+
+            coes = np.zeros(n)
+
+            for i in range(n):
+                basis_coeffs = expand_basis_polynomial(x_vals, i)
+                coes += y_vals[i] * wghts[i] * basis_coeffs
+            
+            return coes"""
+            
+
+        coes = barycentric(lst, list(range(len(lst))))
+        self.funct = None
 
     def soft_insert(self, item, count=1):
         item = sub("[^A-Za-z]", "", item)
@@ -118,7 +175,7 @@ class HashMap:
         index = sub("[^A-Za-z]", "", index)
         if len(index) == 0:
             raise IndexError("Only letter characters are allowed")
-        scaled_index = log(self.l1Hash(index),10)
+        scaled_index = self.l1Hash(index)
         self.assert_safe()
         if len(self.array) == 0:
             raise IndexError("The Hash Map is empty")
