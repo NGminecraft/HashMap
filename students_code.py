@@ -85,59 +85,26 @@ class HashMap:
                         if i != j:
                             weights[i] /= (xs[i]-xs[j])
                 return weights
-            def expand_poly(xs, j):
-                basis_coeffs = [1]
-                for k in range(n):
-                    if j != k:
-                        denom = xs[j] - xs[k]
-                        new_basis = [0] + [c / denom for c in basis_coeffs]
-                        for l in range(len(basis_coeffs)):
-                            new_basis[l] -= (xs[k] * basis_coeffs[l]) / denom
-                        basis_coeffs = new_basis
-                return basis_coeffs
-            
+
             weights = barycentric_weights(x_vals)
-            coes = [0] * n
-            for i in range(n):
-                basis_coeffs = expand_poly(x_vals, i)
-                for k in range(n):
-                    coes[k] += y_vals[i] * weights[i] * basis_coeffs[k]
-            return coes
-        
-        """
-        def barycentric(x_vals, y_vals):
-            def barycentric_weights(xs):
-                weights = np.ones(n)
-
+            
+            def barycentric_interpolation(x):
+                numerator = 0
+                denominator = 0
                 for i in range(n):
-                    weights[i] /= np.prod(xs[i]-np.delete(xs, i))
-                return weights
-
-            def expand_basis_polynomial(xs, j):
-                excluded_x = np.delete(xs, j)
-                basis_poly = np.poly(excluded_x)
-                denom = np.prod(xs[i] - excluded_x)
-                return basis_poly / denom
+                    if x == x_vals[i]:
+                        return y_vals[i]
+                    temp = weights[i] / (x - x_vals[i])
+                    numerator += temp * y_vals[i]
+                    denominator += temp
+                return numerator / denominator
             
-            x_vals, y_vals = np.array(x_vals), np.array(y_vals)
-            n = len(x_vals)
-            wghts = barycentric_weights(x_vals)
-
-            coes = np.zeros(n)
-
-            for i in range(n):
-                basis_coeffs = expand_basis_polynomial(x_vals, i)
-                coes += y_vals[i] * wghts[i] * basis_coeffs
-            
-            return coes"""
+            return barycentric_interpolation
             
 
         coes = barycentric(lst, list(range(len(lst))))
         def polynomial(x, coefficents=coes):
-            result = 0
-            for i, v in coefficents:
-                result += v * x ** 2
-            return result
+            return coefficents(x)
         self.funct = polynomial
 
     def soft_insert(self, item, count=1):
